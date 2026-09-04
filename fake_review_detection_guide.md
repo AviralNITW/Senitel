@@ -1,7 +1,6 @@
 #  Fake Review Detection — Complete Interview Preparation Guide
 
-> **Prepared by:** Antigravity AI  
-> **Project Author:** Suman Kumar  
+> **Project Author:** Aviral Mishra  
 > **Stack:** Python · Flask · Word2Vec · SVM · BeautifulSoup · NLTK · Tailwind CSS  
 > **Role Simulation:** Senior Software Engineer · System Architect · Technical Interviewer · Product Manager
 
