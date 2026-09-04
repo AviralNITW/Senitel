@@ -1,7 +1,33 @@
+import os
 import re
 import json
 import requests
 from bs4 import BeautifulSoup
+
+SCRAPER_API_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
+
+def fetch_html(target_url, headers=None, timeout=20):
+    """
+    Fetches HTML directly or through ScraperAPI residential proxy if API key is configured.
+    """
+    if SCRAPER_API_KEY:
+        proxy_url = "http://api.scraperapi.com"
+        params = {
+            "api_key": SCRAPER_API_KEY,
+            "url": target_url,
+            "country_code": "in",
+            "keep_headers": "true"
+        }
+        try:
+            return requests.get(proxy_url, params=params, headers=headers, timeout=timeout)
+        except Exception as e:
+            print(f"Proxy fetch error: {e}")
+            return None
+    try:
+        return requests.get(target_url, headers=headers, timeout=timeout)
+    except Exception as e:
+        print(f"Direct fetch error: {e}")
+        return None
 
 def clean_review_text(raw_text):
     """Cleans standard e-commerce UI noise from review text."""
@@ -71,8 +97,8 @@ def scrape_flipkart_reviews(url, max_pages=2):
             target += f"?page={page}"
 
         try:
-            response = requests.get(target, headers=headers, timeout=12)
-            if response.status_code != 200:
+            response = fetch_html(target, headers=headers, timeout=18)
+            if not response or response.status_code != 200:
                 break
 
             # 1. Try INITIAL_STATE JSON extraction
@@ -147,8 +173,8 @@ def scrape_amazon_reviews(url, max_pages=2):
                 'Upgrade-Insecure-Requests': '1'
             }
 
-            response = requests.get(target_url, headers=headers, timeout=12)
-            if response.status_code != 200:
+            response = fetch_html(target_url, headers=headers, timeout=18)
+            if not response or response.status_code != 200:
                 continue
 
             html = response.text
