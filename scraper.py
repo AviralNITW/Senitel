@@ -154,12 +154,13 @@ def scrape_amazon_reviews(url, max_pages=2):
     domain_match = re.search(r'https?://(?:www\.)?(amazon\.[a-z\.]+)', url, re.IGNORECASE)
     domain = domain_match.group(1) if domain_match else "amazon.com"
 
-    urls_to_try = []
+    urls_to_try = [url]
     if asin:
-        urls_to_try.append(f"https://www.{domain}/dp/{asin}")
+        dp_url = f"https://www.{domain}/dp/{asin}"
+        if dp_url.lower() != url.lower():
+            urls_to_try.append(dp_url)
         for p in range(1, max_pages + 1):
             urls_to_try.append(f"https://www.{domain}/product-reviews/{asin}?pageNumber={p}&reviewerType=all_reviews")
-    urls_to_try.append(url)
 
     all_reviews = []
     seen = set()
@@ -186,23 +187,32 @@ def scrape_amazon_reviews(url, max_pages=2):
             review_blocks = soup.select('[data-hook="review"], [data-hook="reviewContainer"], .review, div[id^="customer_review"]')
 
             for block in review_blocks:
-                text_el = block.select_one('[data-hook="reviewText"], [data-hook="review-body"], .review-text-content, .review-text')
-                if not text_el:
-                    continue
-
-                raw_body = clean_review_text(text_el.get_text(strip=True))
-                if len(raw_body) < 15 or raw_body in seen:
-                    continue
-
                 rating_el = block.select_one('[data-hook="review-star-rating"], .review-rating, .a-icon-alt')
                 rating_str = rating_el.get_text(strip=True) if rating_el else "5.0"
                 rating_match = re.search(r'\d+\.?\d*', rating_str)
                 rating = rating_match.group() if rating_match else "5.0"
 
-                seen.add(raw_body)
-                all_reviews.append({"Rating": rating, "Review Text": raw_body})
+                text_el = block.select_one('[data-hook="review-collapsed"], [data-hook="review-body"], .review-text-content, .review-text')
+                raw_body = ""
+                if text_el:
+                    raw_body = text_el.get_text(strip=True)
+                else:
+                    for s in block.find_all('span'):
+                        classes = s.get('class') or []
+                        data_hook = s.get('data-hook') or ''
+                        if any(k in ' '.join(classes) for k in ['profile', 'icon', 'button', 'badge', 'date']) or data_hook in ['review-date', 'avp-badge']:
+                            continue
+                        txt = s.get_text(strip=True)
+                        if len(txt) > 15 and not txt.startswith("Reviewed in") and not txt.startswith("Size:") and not txt.startswith("Color:") and "found this helpful" not in txt and "Verified Purchase" not in txt:
+                            raw_body = txt
+                            break
 
-            if len(all_reviews) >= 15:
+                clean_body = clean_review_text(raw_body)
+                if len(clean_body) >= 8 and clean_body not in seen:
+                    seen.add(clean_body)
+                    all_reviews.append({"Rating": rating, "Review Text": clean_body})
+
+            if len(all_reviews) >= 5:
                 break
 
         except Exception as e:
