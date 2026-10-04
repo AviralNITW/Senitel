@@ -14,6 +14,12 @@ app = Flask(
     static_url_path="/static"
 )
 
+try:
+    from flask_compress import Compress
+    Compress(app)
+except ImportError:
+    pass
+
 # Global model holders
 _word2vec_model = None
 _svm_model = None
